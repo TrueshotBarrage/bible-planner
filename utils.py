@@ -5,7 +5,7 @@ Copyright 2021 David Kim. All rights reserved.
 """
 
 # Imports
-from fractions import gcd
+import math
 
 
 def split(x, n):
@@ -39,9 +39,9 @@ def split(x, n):
 
         high = n - zp
         if high > zp:
-            cd = gcd(high, zp)
+            cd = math.gcd(high, zp)
         else:
-            cd = gcd(zp, high)
+            cd = math.gcd(zp, high)
 
         hi = int(high / cd)
         lo = int(zp / cd)
