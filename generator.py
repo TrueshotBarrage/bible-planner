@@ -56,8 +56,10 @@ def request_metadata(force, **config) -> list:
         print(f"Gathering statistics for {book_name}...")
 
         # If we did this before, no need to req it again. Let's skip the API
-        if not force and os.path.isfile(f"{book_id}.txt"):
-            with open(f"{book_id}.txt", "r") as rf:
+        dirname = os.path.dirname(__file__)
+        book_data_path = os.path.join(dirname, "cache", f"{book_id}.txt")
+        if not force and os.path.isfile(book_data_path):
+            with open(book_data_path, "r") as rf:
                 lines = rf.readlines()
                 chapter_count = int(lines[1].split(": ")[1])
                 verse_count = int(lines[2].split(": ")[1])
@@ -90,7 +92,7 @@ def request_metadata(force, **config) -> list:
         meta.append(book_meta)
 
         # Generate a file report of the book-specific meta
-        with open(f"{book_id}.txt", "w") as out:
+        with open(book_data_path, "w") as out:
             out.write(f"Book name: {book_name}\n")
             out.write(f"Chapter count: {chapter_count}\n")
             out.write(f"Verse count: {verse_count}\n")
