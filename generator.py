@@ -15,7 +15,10 @@ import argparse
 import datetime
 
 import utils
-from secrets import API_KEY
+try:
+    from secrets import API_KEY
+except:
+    API_KEY = None
 
 base_url = "https://api.scripture.api.bible"
 # KJV version id - hardcoded from API
@@ -40,13 +43,19 @@ def request_metadata(force, **config) -> list:
         raise ValueError("List of books not provided")
 
     # First, get the list of book objects from the API
-    params = {"api-key": API_KEY}
-    req0_url = "/books"
-    url = f"{base_url}{kjv_url}{req0_url}"
-    books_res = requests.get(url, headers=params)
-    books = books_res.json()["data"]
+    if API_KEY is not None:
+        params = {"api-key": API_KEY}
+        req0_url = "/books"
+        url = f"{base_url}{kjv_url}{req0_url}"
+        books_res = requests.get(url, headers=params)
+        books = books_res.json()["data"]
+        print("Connection established to the Bible API.")
+    else:
+        with open("books_of_the_bible.json", "r") as bf:
+            books = json.load(bf)["data"]
+        print("Secrets file not found, so defaulting to prefetched data.")
+
     books = [d for d in books if d["name"] in config["books"]]
-    print("Connection established to the Bible API.")
 
     meta = []
 
@@ -56,8 +65,7 @@ def request_metadata(force, **config) -> list:
         print(f"Gathering statistics for {book_name}...")
 
         # If we did this before, no need to req it again. Let's skip the API
-        dirname = os.path.dirname(__file__)
-        book_data_path = os.path.join(dirname, "cache", f"{book_id}.txt")
+        book_data_path = os.path.join("cache", f"{book_id}.txt")
         if not force and os.path.isfile(book_data_path):
             with open(book_data_path, "r") as rf:
                 lines = rf.readlines()
