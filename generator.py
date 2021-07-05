@@ -16,6 +16,7 @@ import datetime
 
 import utils
 try:
+    print("importing api key...")
     from secrets import API_KEY
 except:
     API_KEY = None
@@ -147,7 +148,7 @@ def get_day_reading_text(meta, b, curr_chapter, day):
     return day_readings
 
 
-def generate_plan(meta, duration, start, chapters) -> None:
+def generate_plan(meta, duration, start, chapters, write=True) -> str:
     """
     Generate a Bible reading plan from the specified arguments.
 
@@ -156,6 +157,10 @@ def generate_plan(meta, duration, start, chapters) -> None:
         duration (int): The number of days for the plan.
         start (datetime.datetime): The start date for the plan.
         chapters (int): The total number of chapters for the planned books.
+        write (bool): Whether to write the plan to a file.
+    
+    Returns:
+        str: The plan as text (CSV) output.
     """
 
     # Retrieve the number of chapters needed to be read per day in list form
@@ -165,32 +170,50 @@ def generate_plan(meta, duration, start, chapters) -> None:
     except ValueError:
         chapters_per_day = [1 for _ in range(chapters)]
 
+    # We want a CSV file as output
+    if write:
+        csvf = open("reading_plan.csv", "w", newline="")
+    # Instead, generate the plan as text output
+    else:
+        from io import StringIO
+        csvf = StringIO()
+
     # Write to the plan
-    with open("reading_plan.csv", "w", newline="") as csvf:
-        w = csv.writer(csvf, delimiter=',')
-        b = 0
-        curr_day = start
-        curr_book = meta[b]
-        curr_chapter = 1
-        for i, day in enumerate(chapters_per_day):
-            day_readings = get_day_reading_text(meta, b, curr_chapter, day)
-            w.writerow([curr_day.strftime("%m/%d/%Y"), day_readings])
+    w = csv.writer(csvf, delimiter=',')
+    b = 0
+    curr_day = start
+    curr_book = meta[b]
+    curr_chapter = 1
+    for i, day in enumerate(chapters_per_day):
+        day_readings = get_day_reading_text(meta, b, curr_chapter, day)
+        w.writerow([curr_day.strftime("%m/%d/%Y"), day_readings])
 
-            if i != len(chapters_per_day) - 1:
-                curr_day += datetime.timedelta(days=1)
-                curr_chapter += day
-                while curr_chapter > curr_book["chapters"]:
-                    b = b + 1
-                    curr_chapter = curr_chapter - curr_book["chapters"]
-                    curr_book = meta[b]
+        if i != len(chapters_per_day) - 1:
+            curr_day += datetime.timedelta(days=1)
+            curr_chapter += day
+            while curr_chapter > curr_book["chapters"]:
+                b = b + 1
+                curr_chapter = curr_chapter - curr_book["chapters"]
+                curr_book = meta[b]
+
+    if write:
+        plan_csv = "Written to file"
+        csvf.close()
+    else:
+        csvf.seek(0)
+        plan_csv = csvf.read()
+        csvf.close()
+
+    return plan_csv
 
 
-def process_meta(meta, **config) -> dict:
+def process_meta(meta, write=True, **config) -> dict:
     """
     Process the raw metadata into info we want for generating the reading plan.
 
     Args:
         meta (list): The metadata of the books of the Bible in dict format.
+        write (bool): Whether to write the plan to a file.
         config (**kwargs): If "duration" and "start" specified, generate a plan.
     
     Returns:
@@ -212,7 +235,9 @@ def process_meta(meta, **config) -> dict:
         processed_meta["chapters_per_day"] = total_chapter_count / duration
         processed_meta["verses_per_day"] = total_verse_count / duration
 
-        generate_plan(meta, duration, config["start"], total_chapter_count)
+        plan_csv = generate_plan(meta, duration, config["start"],
+                                 total_chapter_count, write)
+        processed_meta["plan"] = plan_csv
 
     return processed_meta
 
@@ -241,7 +266,21 @@ def main() -> None:
     config["start"] = start
 
     meta = request_metadata(args.force, **config)
-    processed_meta = process_meta(meta, **config)
+    processed_meta = process_meta(meta, write=True, **config)
+
+
+def run_from_server(cfg_json) -> dict:
+    config = json.loads(json.loads(cfg_json))
+
+    books = config["books"]
+    duration = config["duration"]
+    start = datetime.datetime.strptime(config["start"], "%b-%d-%Y")
+    config["start"] = start
+
+    meta = request_metadata(True, **config)
+    processed_meta = process_meta(meta, write=False, **config)
+
+    return processed_meta
 
 
 if __name__ == "__main__":
